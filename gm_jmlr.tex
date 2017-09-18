@@ -1,0 +1,183 @@
+\documentclass[twoside,11pt]{article}
+
+% Any additional packages needed should be included after jmlr2e.
+% Note that jmlr2e.sty includes epsfig, amssymb, natbib and graphicx,
+% and defines many common macros, such as 'proof' and 'example'.
+%
+% It also sets the bibliographystyle to plainnat; for more information on
+% natbib citation styles, see the natbib documentation, a copy of which
+% is archived at http://www.jmlr.org/format/natbib.pdf
+
+\usepackage{jmlr2e}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{verbatim}
+\usepackage{wrapfig}
+\usepackage{color}
+\usepackage{stfloats}
+\usepackage{float}
+\usepackage{natbib}
+\setlength{\bibsep}{7pt}
+
+
+
+% Definitions of handy macros can go here
+
+\newcommand{\dataset}{{\cal D}}
+\newcommand{\fracpartial}[2]{\frac{\partial #1}{\partial  #2}}
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\newcommand{\argmax}{\operatornamewithlimits{argmax}}
+\newcommand{\argmin}{\operatornamewithlimits{argmin}}
+\newcommand{\x}{\mathbf{x}}
+\newcommand{\e}{\mathbf{e}}
+\newcommand{\cc}{\mathbf{c}}
+\newcommand{\w}{\mathbf{w}}
+\newcommand{\z}{\mathbf{z}}
+\newcommand{\rr}{\mathbf{r}}
+\newcommand{\q}{\mathbf{q}}
+\newcommand{\bb}{\mathbf{b}}
+\newcommand{\hl}{\mathbf{h}}
+\newcommand{\dl}{\boldsymbol{\delta}}
+\newcommand{\ab}{\boldsymbol\alpha}
+\newcommand{\bl}{\boldsymbol{\beta}}
+\newcommand{\bp}{\boldsymbol{\phi}}
+\newcommand{\btheta}{\boldsymbol{\theta}}
+\newcommand{\y}{\mathbf{y}}
+\newcommand{\Lb}{\mathbf{L}}
+\newcommand{\Wb}{\mathbf{W}}
+\newcommand{\Ib}{\mathbf{I}}
+\newcommand{\Kb}{\mathbf{K}}
+\newcommand{\Hb}{\mathbf{H}}
+\newcommand{\Qb}{\mathbf{Q}}
+\newcommand{\Pb}{\mathbf{P}}
+\newcommand{\Xb}{\mathbf{X}}
+\newcommand{\Sb}{\mathbf{S}}
+\newcommand{\Rb}{\mathbf{R}}
+\newcommand{\Fb}{\mathbf{F}}
+\newcommand{\fullname}{Gradient Boosted Feature Extraction}
+\newcommand{\name}{GBFE}
+\newcommand{\eddie}{\textcolor{black}}
+\newcommand{\kilian}{\textcolor{red}}
+\definecolor{orange}{rgb}{1,0.5,0}
+\newcommand{\Matt}{\textcolor{green}}
+%\newcommand{\Matt}{\textcolor{black}}
+\newcommand{\oc}[1]{\textbf{[OC: #1]}}
+\sloppy
+
+
+% Heading arguments are {volume}{year}{pages}{submitted}{published}{author-full-names}
+
+\jmlrheading{1}{2012}{1-48}{4/00}{10/00}{Zhixiang (Eddie) Xu, Matt J. Kusner, Gao Huang, Kilian Q. Weinberger, Alice X. Zheng, Olivier Chapelle}
+
+% Short headings should be running head and authors last names
+
+\ShortHeadings{Feature Extraction with Gradient Boosted Regression Trees}{Xu, Kusner, Huang, Zheng, and Chapelle}
+\firstpageno{1}
+
+\begin{document}
+
+\title{Feature Extraction with Gradient Boosted Regression Trees}
+
+\author{\name Zhixiang (Eddie) Xu \email xuzx@cse.wustl.edu \\
+       \addr Citadel\\
+       Chicago, IL 60603, USA\\
+       % \addr Department of Computer Science\\
+       % Washington University\\
+       % St. Louis, MO 63130, USA
+       \AND
+       \name Matt J.\ Kusner \email mkusner@wustl.edu \\
+       \addr Department of Computer Science\\
+       Washington University\\
+       St. Louis, MO 63130, USA\\
+       % \addr Department of Computer Science\\
+       % Washington University\\
+       % St. Louis, MO 63130, USA
+       \AND
+       \name Gao Huang \email g09@mails.tsinghua.edu.cn
+       \AND
+       \name Kilian Q.\ Weinberger \email kilian@wustl.edu \\
+       \addr Department of Computer Science\\
+       Cornell University\\
+       Ithaca, NY 14853, USA\\
+       \AND
+       \name Alice X.\ Zheng \email alicez@graphlab.com \\
+       \addr GraphLab\\
+       Seattle, WA 98051, USA
+	   \AND
+       \name Olivier Chapelle \email olivier@chapelle.cc \\
+       \addr Criteo\\
+       Palo Alto, CA 94301, USA}	   
+	   
+	   
+
+
+\editor{XXX}
+
+\maketitle
+
+\begin{abstract}%   <- trailing '%' for backward compatibility of .sty file
+\input{abstract.tex}
+\end{abstract}
+
+\begin{keywords}
+  Feature Extraction, Budgeted Learning, Gradient Boosting, Regression Trees
+\end{keywords}
+
+\section{Introduction}
+\input{intro.tex}
+
+\section{Notation and Background}
+\label{sec:background}
+\input{background.tex}
+
+\section{Unique Properties of Gradient Boosted Regression Trees}
+\label{sec:gbrt}
+\input{gbrt.tex}
+
+\section{Budgeted Learning}
+\label{sec:greedymiser}
+\input{greedymiser.tex}
+
+\section{Feature Selection}
+\label{sec:gbfs}
+\input{gbfs.tex}
+
+\section{Analysis of Variance}
+\label{sec:variance}
+\input{variance.tex}
+
+\section{Results}
+\label{sec:results}
+\input{results.tex}
+
+\section{Related Work}
+\label{sec:related}
+\input{related_work.tex}
+
+\section{Conclusions}
+\label{sec:conclude}
+\input{conclusion.tex}
+
+% Acknowledgements should go at the end, before appendices and references
+
+% \acks{We would like to acknowledge support for this project
+% from the National Science Foundation (NSF grant IIS-9988642)
+% and the Multidisciplinary Research Program of the Department
+% of Defense (MURI N00014-00-1-0637). }
+
+% Manual newpage inserted to improve layout of sample file - not
+% needed in general before appendices/bibliography.
+
+\newpage
+
+\appendix
+%\section*{Appendix A.}
+%\label{app:theorem}
+
+\vskip 0.1in
+\bibliography{gm_jmlr}
+
+\end{document}

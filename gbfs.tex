@@ -1,0 +1,44 @@
+%!TEX root=gm_jmlr.tex
+In this section, we first describe the problem of feature selection and build connections between feature selection and test-time budgeted learning. We then extend \name{} for feature selection.
+
+\subsection{Gradient Boosted Feature Extraction for Feature Selection}
+The goal of feature selection is to reliably extract features that best explain the labels of a set of instances. In addition, a good feature selection algorithm should also be able to identify non-linear feature combinations, scale to very large data sets, and allow the incorporation of structured feature information defined by the learning problem. All these requirements are very similar to those of budgeted learning. Therefore GBRT based \name{} can be naturally extended for feature selection. However, two key modifications need to be made to accommodate specifics of feature selection. Firstly, the tree evaluation cost should not be considered in optimization, as test-time evaluation cost is no longer a concern. Secondly, different from budgeted learning, feature selection aims to find the most relevant features, rather than the most cost-effective features. Therefore, all features should be treated equally, and have the same chance of being selected. Given these two requirements, we derive a new optimization problem,
+\begin{align}
+	\min_{\bl} \ell(\bl) + \mu \|\bl\|_1 + \lambda \sum_{\alpha=1}^p \left\|\sum_{t=1}^T F_{\alpha t} \beta_t\right\|_0. \label{eq:gbfs_original}
+\end{align}
+Compared to the cost function (\ref{eq:cost}), the feature extraction cost for each individual feature $c_{\alpha}$ is removed, which gives every feature equal chance of being selected. The $l_1$-norm serves as a regularization term to avoid overfitting. 
+
+Similar to the relaxation described for \name{}-BL, the $l_0$-norm term in (\ref{eq:gbfs_original}) can be relaxed using capped $l_1$-norm as in (\ref{eq:relax_featurecost}). As we perform the same coordinate descent optimization procedure described in GBFE-BL, where we increase a single dimension of $\bl$ with a fixed step-size $\eta$, the $l_1$-norm of $\bl$ can be expressed as $\|\bl\|_1 = \eta m$ after $m$ iterations. We can therefore move the $l_1$-norm regularization term from the objective function to the constraint, and use the number of iterations $m$ to control overfitting. We obtain a relaxed optimization problem:
+\begin{align}
+    \min_{\bl} & \hspace{5pt} \ell(\bl) + \lambda \sum_{\alpha=1}^p \left\|\sum_t F_{\alpha t} \beta_t\right\|_{\lceil 1} \label{eq:gbfs}\\
+	s.t. & \hspace{5pt} \frac{1}{\eta}\|\bl\|_1 \le m. \nonumber	
+\end{align} 
+If we set $\lambda = \frac{1}{\eta}$, this feature selection penalty relaxation is exactly the number of features selected.
+We optimize (\ref{eq:gbfs}) using the same coordinate descent procedure described in the GBFE-BL. The only difference is that since the individual feature extraction cost $c_{\alpha}$ is removed from (\ref{eq:gbfs}), the resulting CART impurity function is slightly different from (\ref{eq:lambdatree}),
+\begin{align}
+	h_t\!=\!\arg\!\min_{\hspace{-3ex}h_t\in{\cal H}} \frac{1}{2}\displaystyle\sum_{i=1}^n (g_i-h_t(x_i))^2 \!+\! \lambda' \sum_{\alpha=1}^p \phi_{\alpha} F_{\alpha t}. & \label{eq:gbfs_impurity}
+\end{align}
+We detail the algorithm in Algorithm \ref{table:gbfs}, and since the algorithm is based on Gradient Boosting Feature Extraction for feature selection, we refer to it as GBFE-FS.
+\begin{algorithm}[t!!!]
+	\caption{GBFE-FS in pseudo-code.\label{table:gbfs}}
+	\label{algo}
+	\begin{algorithmic}[1]
+	\STATE Input: data $\{\x_i, y_i\}$, learning rate $\epsilon$, iterations $m$. \\
+	\STATE Initialize predictions $H = 0$ and selected feature set $\Omega = \emptyset$.
+	\FOR{$t = 1$ {\bf to} $m$}
+	\STATE Learn $h_t$ using greedy CART to minimize the impurity function (\ref{eq:gbfs_impurity}).
+	\STATE Update $H = H + \eta h_t$.
+	\STATE For each feature $\alpha$ used in $h_t$, set $\phi_\alpha = 0$ and $\Omega = \Omega \cup \alpha$.
+	\ENDFOR
+	\STATE Return $H$ and $\Omega$.
+	\end{algorithmic}
+\end{algorithm}
+
+\subsection{Structured Feature Selection}
+\label{sec:structure}
+In many real-world feature selection problems, qualitative information about feature sparsity patterns are pre-defined, and selecting features without following these patterns voids their interpretability. For example, in bio-informatics, features can be grouped into clusters and the goal is to identify features within a single cluster. Prior work on incorporating this structured feature information include the Group Lasso~\citep{huang2011learning,roth2008group} and the Generalized Lasso~\citep{roth2004generalized}. One key advantage of GBFE-FS is that it inherits a two-step optimization procedure from GBRT, where feature extraction is handled by the CART algorithm and its impurity function (\ref{eq:gbfs_impurity}). Therefore GBFE-FS can easily handle structured feature information by appropriately setting the feature cost identity variable $\phi_\alpha$. For example, for the bio-informatics setting, we can set $\phi_\alpha = 1$ if and only if \emph{no feature} is selected from the same cluster as feature $\alpha$ in the previous iterations, and set $\phi_\alpha = 0$ otherwise. Once a feature $\alpha$ is used, all other feature in the same cluster become \emph{free} and the impurity function (\ref{eq:gbfs_impurity}) will encourage to building trees using features from this cluster exclusively. This will happen until the reduction in loss of selecting a non-cluster feature outweighs the reward of selecting a cluster feature.
+
+In a more general setting, we can define $\phi_\alpha$ as a function, where $\mbox{$\phi_\alpha:\Omega\rightarrow{\cal R}_{\geq0}$}$. It maps features to a cost, conditioned on a set of previously-extracted features. By defining $\phi_\alpha$ as a function in this way, we can model the scenario where once a feature $\alpha$ is extracted, it will make the extraction cost of a related feature $\gamma$ cheaper, if not free. One example is in medical image classification (\emph{e.g.} MRI scans), where features are image pixels and pre-defined feature clusters are local regions of interest. In this case, once a pixel $\alpha$ is extracted, all pixels surrounding it $\pi: \{\gamma \in \pi, \gamma \textrm{ is a neighbor of } \alpha\}$ should be encouraged to be selected. GBFE-FS can easily achieve this by reducing the value of $\boldsymbol{\phi}(\pi)$.
+
+
+

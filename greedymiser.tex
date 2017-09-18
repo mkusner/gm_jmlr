@@ -1,0 +1,141 @@
+%!TEX root=gm_jmlr.tex 
+In this section, we first describe the test-time budgeted learning setting, and then introduce our Gradient Boosted Feature Extraction algorithm variant for budgeted learning. As described in~(\ref{eq:boosting-trick}), the classifier $H$ can be regarded as a linear function of weak learners $h_1, \ldots, h_T$, %\hl$
+parameterized by coefficients $\bl$. As costs will arise from weak learners $h_t$, we will formalize the test-time computational cost of evaluating the classifier $H$ as a function of the sparsity of a given weight-vector $\bl$ (indicating whether each $h_t$ is used or not). 
+
+\subsection{Test-time computational cost}
+The test-time computational cost of $H$ consists of two parts: (a) the evaluation cost of all trees $h_t$ with $\bl_t > 0$ and (b) the extraction cost of features used in these trees. Let $c_e$ denote the single tree evaluation cost, and $c_\alpha$ the cost of extracting feature $\alpha$ the first time (since feature values can be cached efficiently, all subsequent retrieval on this feature is free). Note that $c_e$ is a constant independent of the number of training sample inputs, and is usually very small if the tree depth is small. Thus, the fact that GBRT is a parametric classifier is an key advantage of GBRT over other non-linear algorithms (e.g., kernel-based methods) in the large-scale setting. %, as GBRT is a pure parametric classifier.   
+With this notation, we can describe the test-time cost as a function of $\bl$:
+\begin{align}
+	c(\bl)=c_e\|\bl\|_0+\sum_{\alpha=1}^p c_\alpha\left\|\sum_{t=1}^T F_{\alpha t} \beta_t\right\|_0, \label{eq:cost}
+\end{align}
+where $\Fb$ is the binary indicator matrix $\Fb \in \{0,1\}^{p \times T}$ defined in Section \ref{sec:bg_gbrt}, where $T$ is the number of possible limited regression trees and $p$ is the raw feature dimensionality. We have that $\Fb_{\alpha t} = 1$ if and only if feature $\alpha$ is used somewhere to split the regression tree $t$. The $l_0$-norm for scalars is defined as $\|a\|_0\rightarrow\{0,1\}$ with $\|a\|_0=1$ if and only if $a\neq 0$. In addition to the cost, we also have a pre-defined test-time budget $B \ge 0$, and our goal is to learn a classifier $H$ (parameterized by $\bl$) such that its test-time cost does not exceed the budget,
+\begin{align}
+	\min_{\bl} \ell(\bl), \textrm{ s.t. } c(\bl) \le B, \label{eq:budget_loss}
+\end{align}
+where $\ell$ is the loss function for learning $H$ as in (\ref{eq:loss}).
+
+\subsection{Relaxation}
+The optimization problem stated in (\ref{eq:budget_loss}) is non-continuous because of the $l_0$ norm in the cost term in (\ref{eq:cost}). To make the optimization amenable to gradient-based techniques we propose a relaxation of the cost term, and subsequently optimize the relaxed optimization problem. 
+
+Recall that $\hl(\x) = [h_1(\x),\dots,h_T(\x)]^\top$ contains all possible regression trees of some limited depth from ${\cal H}$. Our algorithm will initialize $\bl = 0$ and perform coordinate descent on $\bl$, incrementing one dimension of $\bl$ by some step-size $\eta > 0$ each iteration. As the number of iterations (\emph{i.e.} $\le 5000$) is small compare to the dimensionality $T$ of  $\hl(\x)$, it is reasonable to assume we never update the same dimension twice. 
+%, and our algorithm performs coordinate descent on $\bl$, starting from $\bl = 0$ and increment one dimension of $\bl$ by step-size $\eta > 0$ at each iteration. With a tiny number of iterations (\emph{i.e.} $\le 5000$), and extremely high dimensionality of $\hl(\x)$, it is reasonable to assume that we never increase one dimension twice. 
+Therefore, $\bl$ is binary (up to re-scaling), $\frac{1}{\eta}\bl \in \{0,1\}$.
+
+\subsubsection{Tree evaluation cost relaxation}
+The $l_0$-norm is often relaxed into the convex and continuous $l_1$-norm (the convex envelope of the $l_0$-norm). Since the coefficient $\frac{1}{\eta}\bl$ is binary, the re-scaled $l_1$-norm $ \frac{1}{\eta} \| \bl\|_1$ is identical to the $l_0$-norm. We therefore use an $l_1$-norm relaxation for the tree evaluation cost term:
+\begin{align}
+	c_e\|\bl\|_0 \rightarrow \frac{c_e}{\eta} \|\bl\|_1.
+\end{align}
+
+\subsubsection{Feature extraction cost relaxation}
+Unlike the tree evaluation cost, where we assume each tree will be only used once, features are very likely re-used many times. Thus, the $l_1$-norm relaxation is not a good approximation, as it will penalize features that are re-used many times more than it does those used only once. This is contrary to our assumption that feature reuse incurs no additional cost (as feature values can be cached). As such, we use the capped $l_1$-norm introduced in (\ref{eq:cappedl1}) to relax the feature extraction cost:
+\begin{align}
+	\!\sum_{\alpha=1}^p\!c_\alpha\left\|\sum_{t=1}^T F_{\alpha t} \beta_t\right\|_0\! \longrightarrow  \!\sum_{\alpha=1}^p c_{\alpha} \left\|\sum_{t=1}^T F_{\alpha t} \beta_t\right\|_{\lceil 1}, \label{eq:relax_featurecost}
+\end{align}
+where the capped $l_1$-norm is slightly modified as $\|x\|_{\lceil 1}= \min(\frac{|x|}{\eta}, 1)$. 
+Because $\frac{1}{\eta}\bl  \in \{0,1\}$, $F_{\alpha t} \in \{0,1\}$, and $\beta_t \in \{0, \eta\}$ all arguments of $\|\sum_t F_{\alpha t}\beta_t\|_{\lceil 1}$ 
+are non-negative multiples of $\eta$, and thus we have $\|\sum_t F_{\alpha t}\beta_t\|_{\lceil 1} = \|\sum_t F_{\alpha t}\beta_t\|_0$. This relaxation is also exact.
+
+To further simplify the optimization problem in (\ref{eq:budget_loss}), we split the test-time budget into tree evaluation budget $B_e$ and feature extraction budget $B_f$, and introduce two individual constraints:
+\begin{align}
+	\frac{c_e}{\eta} \|\bl\|_1 \le B_e \textrm{ and } \sum_{\alpha=1}^p c_{\alpha} \left\|\sum_{t=1}^T F_{\alpha t} \beta_t\right\|_{\lceil 1} \le B_f.
+\end{align}
+We can use Lagrangian multiplier $\lambda$ to move the feature cost constraint into the objective function in (\ref{eq:budget_loss}) and obtain the following optimization problem:
+\begin{align}
+    \min_{\bl} & \hspace{5pt} \ell(\bl) + \lambda \sum_{\alpha=1}^p c_{\alpha} \left\|\sum_t F_{\alpha t} \beta_t\right\|_{\lceil 1} \label{eq:opt}\\
+	\textrm{s.t.} & \hspace{5pt} \frac{c_e}{\eta}\|\bl\|_1 \le B_e. \nonumber	
+\end{align} 
+
+\subsection{Optimization}
+In this subsection, we describe how we solve the optimization problem (\ref{eq:opt}).
+
+\subsubsection{Solution path}
+Inspired by \citet{rosset2004boosting}, we find a solution path for (\ref{eq:opt}) with evenly spaced tree-evaluation budgets, ranging from $\tilde{B}_e = 0$ to $\tilde{B}_e = B_e$. To build the solution path, we gradually increase the budget $\tilde{B}_e$ by $\eta$, and iteratively solve the intermediate optimization problem, using the solution from the previous iteration as initialization. Specifically, we solve for the following optimization problem at each iteration,
+\begin{align}
+	\min_{\dl\geq 0} & \hspace{5pt} \overbrace{\ell(\bl + {\dl}) + \lambda \sum_{\alpha=1}^p c_{\alpha} \left\|\sum_t F_{\alpha t} (\beta_t + \delta_t)\right\|_{\lceil 1}}^{\cal L(\bl + \dl)} \label{eq:replace}\\
+	\textrm{s.t.} & \hspace{5pt} \|\dl\|_1 \le \eta. \nonumber	
+\end{align} 
+The Taylor expansion on ${\cal L}$ around $\bl$ is,
+\begin{align}
+	{\cal L}({\bl} + {\dl}) = {\cal L}({\bl}) + 	\langle\nabla {\cal L}(\bl), \dl \rangle + O(\dl^2). \label{eq:taylor_path}
+\end{align}
+Note that $\|\bl\|_1 \le \eta$ and if $\eta$ is small, we can approximate (\ref{eq:taylor_path}) by its dominating linear term and simplify the optimization problem:
+\begin{align}
+	\min_{\dl\geq 0} \langle \nabla{\cal L}(\bl), \dl \rangle, \hspace{5pt} \textrm{s.t.}~\|\dl\|_1 \le \eta. \label{eq:linear_optimization}
+\end{align}
+
+\subsubsection{Coordinate descent}
+We can further simplify the optimization problem (\ref{eq:linear_optimization}) to identifying the steepest descent direction w.r.t. $\bl$. Let $\nabla {\cal L}(\beta)_t$ denote the gradient w.r.t. the $t^{th}$ dimension. We can define the steepest descent direction as 
+\begin{equation}
+	t^* = \arg\!\min_{\hspace{-3ex}t} \nabla {\cal L}(\beta)_t. \label{eq:mint}
+\end{equation}
+Since the set of all regression trees is negation closed, we have $\nabla{\cal L}(\bl)_{t^*}=-\|  \nabla{\cal L}(\bl) \|_{\infty}$. By applying H\"older's inequality we can derive the following lower bound of the inner product in (\ref{eq:linear_optimization}),
+\begin{align}
+	\langle \nabla{\cal L}(\bl), \dl \rangle & \ge - | \langle \nabla{\cal L}(\bl), \dl \rangle | \nonumber \\
+								& \ge - \|  \nabla{\cal L}(\bl) \|_{\infty}\|  \dl  \|_{1} \nonumber \\
+								& \ge  \eta\nabla {\cal L}(\beta)_{t^*} .	\label{eq:holder}
+\end{align}
+If we set $\delta^*_{t^*}\!=\!\eta$ and $\delta^*_{\neq t^*}\!=\!0$, the inequality holds and it is the optimal solution to (\ref{eq:holder}). In summary, we can solve the optimization problem (\ref{eq:linear_optimization}) by identifying the steepest gradient descent direction $\nabla{\cal L}(\bl)_{t^*}$, and assign the corresponding entry of $\dl$ to $\eta$ while setting all other entries to zero.
+
+To find the steepest descent direction, we first notice that the gradient $\nabla{\cal L}(\bl)_{t}$ consists of two parts, the gradient of the loss $\ell$ and the gradient of the feature extraction cost. The gradient of the latter term $\|\sum_t F_{\alpha t}\beta_t\|_{\lceil 1}$, which involves the capped $l_1$-norm, is not well defined when $\sum_t F_{\alpha t}\beta_t = \eta$. However, because we assume that we always increase the coefficient $\beta_t$, we can derive the gradient from the \emph{right}, and obtain the right gradient,
+\begin{align}
+	\nabla \left\|\sum_t F_{\alpha t} \beta_t\right\|_{\lceil 1} = \left \{ \begin{array}{cl}
+	\frac{1}{\eta}F_{\alpha t} & |\sum_t F_{\alpha t} \beta_t| < \eta \\
+	0 & |\sum_t F_{\alpha t} \beta_t| \ge \eta.  \label{eq:omega}
+	\end{array} \right. 	
+\end{align}
+We can simplify this gradient term by defining an auxiliary variable $\phi_\alpha \in \{0,1\}$ with $\phi_\alpha = 1$ iff $ |\sum_t F_{\alpha t} \beta_t| < \eta$. Combined with the gradient of $\ell$, $\nabla{\cal L}(\bl)_{t}$ can be expressed as
+\begin{align}
+\nabla {\cal L}(\bl)_t:= \frac{\partial \ell}{\partial \beta_t} + \frac{\lambda}{\eta} \sum_{\alpha=1}^p c_{\alpha} \phi_{\alpha} F_{\alpha t}. \label{eq:gradient}
+\end{align} 
+The first term can be further decomposed into two parts by applying the generalized chain rule. The first part is the partial derivative of the loss w.r.t. the current predicting function $H_{\bl}$ evaluated at a sample input $\x_i$, and the second part is the partial derivative of the predicting function w.r.t. the coefficient of one dimension $\beta_t$. 
+\begin{align}				
+	\nabla{\cal L}(\bl)_t\!=\! \displaystyle\sum_{i=1}^n \frac{\partial \ell}{\partial H_{\bl}(\x_i)} \frac{\partial H_{\bl}(\x_i)}{\partial \beta_{t}} \!+\! \frac{\lambda}{\eta} \sum_{\alpha=1}^p c_{\alpha} \phi_{\alpha} F_{\alpha t}. \label{eq:chain} 
+\end{align}
+Note that as $H_{\bl}(\x_i)$ is a linear function of $\bl$ as described in (\ref{eq:boosting-trick}), we have $\frac{\partial H_{\bl}(\x_i)}{\partial \beta_{t}} = h_t(\x_i)$. Let $g_i$ denote the negative gradient of the loss w.r.t. the predicting function $g_i = -\frac{\partial \ell}{\partial H_{\bl}(\x_i)}$, we can re-write (\ref{eq:chain}) as
+\begin{align}			
+	\nabla{\cal L}(\bl)_t\!=\! \displaystyle\sum_{i=1}^n -g_i h_t(\x_i) + \frac{\lambda}{\eta} \sum_{\alpha=1}^p c_{\alpha} \phi_{\alpha} F_{\alpha t}. \label{eq:ghf} 
+\end{align} 
+For simplicity, ${\cal H}$ is restricted to the set of normalized trees (\emph{i.e.} $\sum_i h_t^2(\x_i) = 1$). We can add two constant terms $\frac{1}{2}\sum_i h_t^2(\x_i)$ and $\frac{1}{2}g_i^2$ to (\ref{eq:ghf}) and complete the binomial equation
+\begin{align}
+	h_t\!=\!\arg\!\min_{\hspace{-3ex}h_t\in{\cal H}} \frac{1}{2}\displaystyle\sum_i^n (g_i-h_t(x_i))^2 \!+\! \lambda' \sum_{\alpha=1}^p c_{\alpha} \phi_{\alpha} F_{\alpha t}, & \label{eq:lambdatree}
+\end{align}
+where $\lambda^\prime = \frac{\lambda}{\eta}$. Note that (\ref{eq:lambdatree}) is very similar to the CART algorithm impurity function in (\ref{eq:CART}). The difference is that (\ref{eq:lambdatree}) contains an extra term $\lambda' \sum_{\alpha=1}^p c_{\alpha} \phi_{\alpha} F_{\alpha t}$. This extra term controls the feature extraction cost and has a meaningful interpretation. Intuitively, this impurity function encourages the CART algorithm to build a tree that not only approximates the negative gradient of the loss $\ell$, but also penalizes the initial extraction of features by their cost $c_\alpha$. Specifically, the $\lambda'$ is the Lagrangian multiplier, which trades-off the feature extraction cost with the approximation to the negative gradient. The term $c_\alpha F_{\alpha t}$ is the cost of a feature that is used by the tree. The interpretation of $\phi_\alpha$ is perhaps more interesting. The term $\phi_\alpha$ is defined from (\ref{eq:omega}). Recall, $\phi_\alpha = 1$ iff $|\sum_t F_{\alpha t} \beta_t| < \eta$, and the condition $|\sum_t F_{\alpha t} \beta_t| < \eta$ is true iff feature $\alpha$ is not used in any trees with $\beta_t > 0$. In other words, $\phi_\alpha = 1$ indicates that feature $\alpha$ has not been extracted in previous trees. Therefore, this feature extraction cost term encourages the CART algorithm to re-use as many as possible previously extracted features until there are diminishing returns for doing so, since once a feature $\alpha$ is extracted, $\phi_\alpha = 0$. \Matt{MATT: What are these two sentences saying?:} We can control the feature extraction cost term by setting $\phi_\alpha = 0$ once a feature is extracted. This naturally extends to our algorithm.
+
+\subsection{Algorithm}
+Our algorithm is based on the CART impurity function. Instead of minimizing the regular impurity function (\ref{eq:CART}), we minimize our own cost-aware impurity function (\ref{eq:lambdatree}). %It has an extra term, which controls the feature extraction cost. 
+As described in the previous section, we update the vector $\boldsymbol{\phi}$ after generating each tree, setting the corresponding entry of any used feature $\alpha$ to $\phi_\alpha = 0$. Algorithm \ref{alg:gbrt} shows a pseudo-code implementation. Since our algorithm is related to GBRT and is designed for test-time budgeted feature extraction, we refer to it as Gradient Boosted Feature Extraction for Budgeted Learning (GBFE-BL).
+
+\begin{algorithm}                      % enter the algorithm environment
+\caption{GBFE-BL in pseudo-code}          % give the algorithm a caption
+\label{alg:gbrt}                           % and a label for \ref{} commands later in the document
+\begin{algorithmic}                    % enter the algorithmic environment
+\REQUIRE $D=\{(\x_i,y_i)\}_{i=1}^n$, step-size $\eta$, iterations $m$
+\STATE $H=0$
+\FOR{$t=1$ to $m$}
+    \STATE $h_t\leftarrow$ \textrm{Use CART to greedily minimize~(\ref{eq:lambdatree}}). % {\cal O}(\{(\x_i,r_i\})$%\textrm{Cart}(\{(\x_1,t_1),\dots,(\x_n,t_n)\},f,d)$ 
+%	\STATE Update the feature usage variable $\phi$ for used features in $h_t$
+	\STATE $H\leftarrow H+\eta h_{t}$.
+	\STATE For each feature $\alpha$ used in $h_t$, set $\phi_\alpha\leftarrow 0$.
+    % \FOR{$i=1$ to $n$}
+    %   \STATE $t_i\leftarrow -\frac{\partial {\cal \ell}}{\partial H_t(\x_i)}$ 
+    % \ENDFOR
+\ENDFOR
+\STATE Return $H$
+% \return{$C$}
+\end{algorithmic}
+\end{algorithm}
+
+\subsubsection{Hyper-parameters}
+GBFE-BL has two very intuitive hyper-parameters. The number of iterations $m$ is tightly connected to the tree evaluation budget $B_e$. Note that the optimal solution of (\ref{eq:linear_optimization}) must satisfy the equality $\|\dl^*\|_1\!=\!\eta$ (unless $\nabla{\cal L}\!=\!\mathbf{0}$, in which case a local minimum has been reached and the algorithm would terminate). As a result, in each iteration $\|\bl\|_1$ increases by exactly $\eta$. %, and it is always a multiple of $\eta$. 
+We can therefore express $\|\bl\|_1$ in terms of the number of iterations $m$, $\|\bl\|_1 = \eta m$ and $\frac{\|\bl\|_1}{\eta} = m$. Since we want to keep the tree evaluation cost less than the tree evaluation budget during test-time as described in the constraint of (\ref{eq:opt}), we limit the number of iterations $m \le \frac{B_e}{c_e}$. %The Lagrange multiplier $\lambda'$ trades-off the classifier complexity and feature extraction cost. 
+The algorithm is insensitive to the step-size $\eta$, and we set it to $\eta = 0.1$ throughout.
+
+\subsubsection{Early-exit}
+\label{sec:early-exit}
+Many budgeted learning algorithms \citep{cambazoglu2010early,chen2011,Saberian2010,Lefakis2010} use early-exiting of inputs to reduce the test-time cost. Specifically, they build a cascade of classifiers, and carefully select subsets of features for each stage of the cascade, where early stages mostly use cheap features and later stages use more expensive and specialized features. During test-time, they then let inputs traverse through the cascade and an input continues depending on its prediction at each stage. %and each stage makes predictions for inputs. 
+Whenever the prediction of a sample input is confident enough (e.g., low entropy or other related criteria), that input is removed from the cascade. Since most sample inputs are removed at early stages, the amortized test-time cost is reduced. 
+
+GBFE-BL can also employ the idea of early-exiting, since GBFE-BL uses an additive classifier $H$, which consists of many weak learners $h_t$. Each weak learner or a group of consecutive weak learners can be thought of as a `stage'. During test-time, we can early-exit some inputs whose prediction is confident by some criteria after some number of these stages. We refer to this extension as \emph{GBFE-BL Early-exit}. 
+
+

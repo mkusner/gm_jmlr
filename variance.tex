@@ -1,0 +1,59 @@
+%!TEX root=gm_jmlr.tex
+In feature extraction applications, there is a trade-off between prediction accuracy/reliability and number of features/test-time cost. For example in budgeted learning, it may be crucial to decide how large the budget $B$ should be so that the learned model is close, in some sense, to the model trained on \emph{an infinitely large budget}. In another example, a practitioner may want to know how many features are enough to provide robust predictions. Since during test-time the true labels are not available, we model this robustness using the variance of predictions. In this section, we introduce a simple method for computing a lower bound on the variance of the prediction.
+
+ % (\emph{i.e. }$\sigma(\hat{H}) = \frac{1}{1+e^{-\hat{H}}}$ for logistic regression classifier or just $H$ for squared loss classifier).
+
+For simplicity, we will assume our classifier is learned using the logistic loss for binary classification (\emph{i.e. $\y \in \{0,1\}$}). When learning our model, we estimate the optimal prediction function $H$ by minimizing the negative log-likelihood functional $\ell(H)$ as in (\ref{eq:loss}), over a fixed dataset. %as described in~(\ref{eq:manifold}),
+%as the parameter $H$ is actually a function.
+%%%Minimizing the negative log-likelihood functional using gradient boosting 
+Minimizing the negative log-likelihood is equivalent to maximum likelihood estimation (MLE). Moreover, this estimate is consistent and asymptotically normal. Let $\hat{H}$ denote this estimate of $H$. Note that $\hat{H}$ is a random variable, because it depends on the training samples used for estimation, while $H$ is not. Let $\sigma(a) \triangleq \frac{1}{1+e^{-a}}$ be the sigmoid function. The average sigmoidal prediction variance of over all $m$ testing inputs $\{\x_1, \dots, \x_m\} \in {\cal R}^p$  can be expressed as
+\begin{align}
+    \frac{1}{m}\sum_{i=1}^{m}\text{Var}\big[\sigma(\hat{H}_i)\big] = \frac{1}{m}\sum_{i=1}^{m}\text{E}\left[\big(\sigma(\hat{H}_i)-\sigma(H_i^*)\big)^2\right], \label{eq:totalvar}
+\end{align}
+where $\hat{H}_i$ is the prediction of the $i^{th}$ input, $m$ is the total number of testing inputs, and $H^*$ is the estimate of predicting function $H$ assuming we have an infinite amount of training inputs. For each input, the expectation is taken over the distribution of predicting functions $p(\hat{H}_i)$. The equation holds because the expectation of this distribution $\text{E}[\hat{H}_i] = H^*_i$.
+
+Because we do not know $H_i^*$ we must approximate it. We can do so by taking the first-order Taylor expansion of $\sigma(H^*_i)$, and expanding around $\hat{H}_i$, to obtain,
+\begin{align}
+    \sigma(H^*_i) \simeq \sigma(\hat{H}_i) + \frac{\partial \sigma(H_i)}{\partial H_i} \Big|_{\hat{H}_i} (H_i^* - \hat{H}_i). \label{eq:taylor}
+\end{align}
+Using this expression, we can rewrite the average variance in eq.~(\ref{eq:totalvar}) as
+\begin{align}
+    \frac{1}{m}\sum_{i=1}^{m}\text{E}\Big[\big(\sigma(\hat{H}_i)-\sigma(H_i^*)\big)^2\Big]  = \frac{1}{m}\sum_{i=1}^{m}\text{E}\Bigg[\Bigg(\frac{\partial \sigma(H_i)}{\partial H_i}\Big|_{\hat{H}_i}(H_i^* - \hat{H}_i)\Bigg)^2\Bigg] \label{eq:expectation}
+\end{align}
+Since $H_i^* = \text{E}[\hat{H}_i]$, we have $\text{E}\Big[(H_i^* - \hat{H}_i)^2\Big] = \text{V}[\hat{H}]$. Moreover, note that $\frac{\partial \sigma(H_i)}{\partial H_i}\Big|_{\hat{H}_i}$ is constant with respect to the expectation. Based on these two observations, we can further simplify (\ref{eq:expectation}) and obtain
+\begin{align}
+    \frac{1}{m} \sum_{i=1}^{m}\Big(\frac{\partial \sigma(H_i)}{\partial H_i}\Big|_{\hat{H}_i}\Big)^2 \text{V}[\hat{H}_i]. \label{eq:delta}
+\end{align}
+The only unknown part is the variance of the estimate $\hat{H}$. Because of the asymptotic normality of MLE, we have $\hat{H} \sim \text{N}(H^*,\text{V}[\hat{H}])$. We can compute $\text{V}[\hat{H}]$ in closed-form by noting that $\text{V}[\hat{H}] = \text{I}_n(\hat{H})^{-1}$, where $\text{I}_n(\hat{H})$ is the Fisher information~\citep{le1986asymptotic}. 
+Given that our objective loss function $\ell$ is twice differentiable, the empirical Fisher information can be computed in closed-form:
+\begin{align}
+  %  I_n(\hat{H}) = \sum_{i=1}^{n+m}  - \textrm{E} \Big[ \frac{\partial^2 {\cal L}(\hat{H}_i)}{\partial \hat{H}_i^2}\Big] \label{eq:fisher}
+     I_n(\hat{H}) = %- \frac{1}{n+m} \sum_{i=1}^{n+m}  \frac{\partial^2 {\cal L}(\hat{H}(\x_i))}{\partial \hat{H}^2}  \label{eq:fisher}
+	\sum_{i=1}^n -  \textrm{E}
+	 \Bigg[ \frac{\partial^2 \ell(y_i|\x_i;\hat{H})}{\partial \hat{H}^2}\Bigg]. \label{eq:fisher}
+\end{align}
+ 
+
+However, different from other distribution parameters, in our model, the distribution parameter $H$ is a function, and the derivative of the objective functional $\ell(H)$ w.r.t. parameter function $H$ can only be evaluated at each input. Therefore, the second order derivative in eq.~(\ref{eq:fisher}) is w.r.t. every single input,
+\begin{align}
+    \frac{\partial^2 \ell (y_i|\x_i;\hat{H})}{\partial \hat{H}^2} = \frac{\partial^2 \ell(y_i|\x_i;\hat{H})}{\partial \hat{H}_i \partial \hat{H}_j}.
+    \label{eq:secondorder}
+\end{align}
+Note that our log-likelihood functional ($\ell$), has
+a non-zero second order derivative only when the derivative is taken w.r.t. one input prediction $H_i$ twice. If we define a diagonal matrix $\Delta_{jj}=\sigma(\hat{H}_j)^2(1-\sigma(\hat{H}_j))$ we can compute the second order derivative in closed form and express the Fisher information as
+%with two terms, where the first term only has $n\times n$ diagonal elements non-zero,
+\begin{equation}
+  \mathbf{I}_n(\hat{H})= \Delta. \label{eq:fishermatrix}
+\end{equation}
+%
+% \begin{align}
+%     \mathbf{I}_n(\hat{H})= \left( \!\! \begin{array}{cccc}
+%     \sigma(\hat{H}_1)^2(1-\sigma(\hat{H}_1)) \!\!\!\!\!\!\!\!\!\!\!\!\!\!\! &  &  & \\
+%       & \!\!\!\!\!\!\!\!\! \ddots \!\!\!\!\!\!\!\!\! &  & \\
+%     &  &  \!\!\!\!\!\!\!\!\!\!\!\!\!\!\! \sigma(\hat{H}_n)^2(1-\sigma(\hat{H}_n))   \!\! & \\
+%     &  &  & \mathbf{0} \end{array} \right) + \lambda \Lb.\label{eq:fishermatrix}
+% \end{align}
+
+Applying the computed Fisher information to (\ref{eq:delta}), we derive a closed-form expression for computing the average variance of testing input predictions. Since at every iteration during gradient boosting, we generate trees to \emph{approximate} the negative gradient, our estimate of $\hat{H}$ is less efficient than MLE, and the variance we compute is a lower bound.
+
+
